@@ -1,3 +1,4 @@
+// Your original code (unchanged, pasted fully for clarity)
 // HELPER: Available API Endpoints
 // Base URL: https://georgian.polaristechservices.com
 
@@ -47,9 +48,8 @@ function checkTokenUsage() {
     }).then(res => {
         return res.json();
     }).then(json => {
-        displayStatus();
+        displayStatus(json);
     })
-
 }
 
 function displayStatus(responseJson) {
@@ -57,65 +57,90 @@ function displayStatus(responseJson) {
     // STEP 7d: Display to user
     let pre = document.createElement("pre"); //<pre></pre>
     pre.textContent = `Enabled: ${responseJson.is_enabled}
-Last Used: ${responseJson.last_used_at}
+Last Used: ${responseJson.last_used_at || "N/A"}
 Student ID: ${responseJson.student_id}
 Name: ${responseJson.student_name}
 Tokens Allocated: ${responseJson.tokens_allocated}
 Tokens Remaining: ${responseJson.tokens_remaining}
-Tokens Used: ${responseJson.token_used}`;
+Tokens Used: ${responseJson.tokens_used || "N/A"}`;
 
     results.appendChild(pre);
-
 }
 
-/* STEP 8: Create the sendChatMessage function for Claude API interaction */
-function sendChatMessage() {
+/* LAB EXTENSION: Multi-Message Chat Feature */
+/* LAB STEP 1: Modify sendChatMessage to use conversation history */
+let conversationHistory = [];
 
-    // STEP 8a: Get form values
-    let userInput = userMessage.value;
-    // STEP 8b: Create complete url
+function sendChatMessage() {
+    let userInput = userMessage.value.trim();
+    if (!userInput) return;
+
+    // Add user message to conversation history
+    conversationHistory.push({ role: "user", content: userInput });
+
+    // Clear input box
+    userMessage.value = "";
+
+    // Prepare API request body with entire conversation history
     let url = `${baseURL}/messages`;
-    // STEP 8c: Prepare the request body according to Claude API format
+
     fetch(url, {
             method: "POST",
             headers: {
                 "X-Student-API-Key": studentApiKey,
                 "Content-Type": "application/json"
             },
-            body: {
-                "model": "claude-3-5-sonnet-20241022",
-                "max-tokens": maxTokens,
-                "messages": [{
-                    "role": "user",
-                    "content": userInput
-                }]
-            } // STEP 8e: Handle the response
-        }).then(response => {
-            return response.json();
-        }).then(json => {
-            displayResponse(json);
-        })
-        // STEP 8d: Make the API request using fetch()
+            body: JSON.stringify({
+                model: "claude-3-5-sonnet-20241022",
+                "max_tokens": maxTokens,
+                messages: conversationHistory
+            })
+        }).then(response => response.json())
+        .then(json => {
+            // Extract Claude's response text
+            let claudeResponse = json.content && json.content[0] && json.content[0].text ? json.content[0].text : "No response";
 
+            // Add Claude's response to conversation history
+            conversationHistory.push({ role: "assistant", content: claudeResponse });
 
-
-
+            // Display updated conversation
+            displayConversation();
+        }).catch(err => {
+            console.error("Error communicating with Claude API:", err);
+        });
 }
-
-function displayResponse(json) {
-    // STEP 8f: Extract the message content from Claude's response
-    console.log(json);
-}
-
-// LAB EXTENSION: Multi-Message Chat Feature
-// After completing the basic implementation, extend the functionality to support conversation history:
-
-/* LAB STEP 1: Modify sendChatMessage to use conversation history */
-// - Add the user's message to conversationHistory
-// - Send the entire conversation to the API instead of just the current message
-// - Add Claude's response to conversationHistory
 
 /* LAB STEP 2: Update the displayResult function for chat-like appearance */
-// - Show messages in a conversation format
-// - Display user and Claude messages differently
-// - Show conversation flow clearly
+function displayConversation() {
+    // Clear previous results
+    results.innerHTML = "";
+
+    conversationHistory.forEach(msg => {
+        let div = document.createElement("div");
+        div.textContent = msg.content;
+
+        if (msg.role === "user") {
+            div.style.backgroundColor = "#d1e7dd"; // light green for user
+            div.style.textAlign = "right";
+            div.style.padding = "8px";
+            div.style.margin = "5px";
+            div.style.borderRadius = "10px";
+            div.style.maxWidth = "60%";
+            div.style.marginLeft = "40%";
+            div.style.fontWeight = "bold";
+        } else {
+            div.style.backgroundColor = "#f8d7da"; // light red for Claude
+            div.style.textAlign = "left";
+            div.style.padding = "8px";
+            div.style.margin = "5px";
+            div.style.borderRadius = "10px";
+            div.style.maxWidth = "60%";
+            div.style.fontWeight = "normal";
+        }
+
+        results.appendChild(div);
+    });
+
+    // Scroll to bottom
+    results.scrollTop = results.scrollHeight;
+}
